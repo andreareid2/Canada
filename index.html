@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html
+
+<!-- Adapted from ArcGIS API for JS at https://developers.arcgis.com/javascript/latest/query-a-feature-layer-sql/ -->
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>ArcGIS API for JavaScript Tutorials: Query a feature layer (SQL)</title>
+  <style>
+    html, body, #viewDiv {
+      padding: 0;
+      margin: 0;
+      height: 100%;
+      width: 100%;
+	  text-align: center;
+	  background-color: #087f9d;
+	  color: white;
+	  font-family: Arial, Helvetica, sans-serif;
+    };
+	p {
+	  margin-left: 10%;
+	  margin-right: 10%;
+	};
+	
+    .esri-ui-corner .esri-component.esri-widget--panel {
+    width: 200px !important;
+};
+
+  </style>
+  <link rel="stylesheet" href="https://js.arcgis.com/4.18/esri/themes/light/main.css">
+  <script src="https://js.arcgis.com/4.18/"></script>
+  <script>
+
+    require([
+      "esri/config",
+      "esri/Map",
+      "esri/views/MapView",
+      "esri/layers/FeatureLayer",
+    ], function(esriConfig,Map, MapView, FeatureLayer) {
+
+      esriConfig.apiKey = "AAPK781fa66e067346ff8a7d33554d70e40f8zQZaiSKHg4UdpQtg3V5cXvZR_ghs-uWbKxu2VQjXlyczQEURdxir3msxY1qEe5d";
+
+	// Andrea Reid: Change Basemap
+      const map = new Map({
+        basemap: "arcgis-colored-pencil" //Basemap layer service
+      });
+
+      const view = new MapView({
+        container: "viewDiv",
+        map: map,
+	// Andrea Reid: centre map on Canada and zoom out
+        center: [-98.76365448050214, 58.795717732483666], //Longitude, latitude
+        zoom: 2
+      });
+
+	// Andrea Reid: change SQL query to target provinces
+      // SQL query array
+      const provinceSQL = ["Choose a Province/Territory", "PRNAME = 'British Columbia / Colombie-Britannique'",  "PRNAME = 'Alberta'", "PRNAME = 'Saskatchewan'", "PRNAME = 'Manitoba'", "PRNAME = 'Ontario'", "PRNAME = 'Quebec / Québec'", "PRNAME = 'New Brunswick / Nouveau-Brunswick'", "PRNAME = 'Nova Scotia / Nouvelle-Écosse'", "PRNAME = 'Prince Edward Island / Île-du-Prince-Édouard'", "PRNAME = 'Newfoundland and Labrador / Terre-Neuve-et-Labrador'", "PRNAME = 'Yukon'", "PRNAME = 'Northwest Territories / Territoires du Nord-Ouest'", "PRNAME = 'Nunavut'"];
+      let whereClause = provinceSQL[0];
+
+      // Add SQL UI
+      const select = document.createElement("select","");
+      select.setAttribute("class", "esri-widget esri-select");
+      select.setAttribute("style", "width: 200px; font-family: 'Avenir Next'; font-size: 1em");
+      provinceSQL.forEach(function(query){
+        let option = document.createElement("option");
+        option.innerHTML = query;
+        option.value = query;
+        select.appendChild(option);
+      });
+
+      view.ui.add(select, "top-right");
+
+       // Listen for changes
+      select.addEventListener('change', (event) => {
+        whereClause = event.target.value;
+
+        queryFeatureLayer(view.extent);
+
+      });
+
+      // Get query layer and set up query
+ const parcelLayer = new FeatureLayer({
+        url: "https://luna.flemingcollege.ca/arcgis/rest/services/Geom99lab2/areid2Canada/MapServer/0",
+      });
+
+      function queryFeatureLayer(extent) {
+
+        const parcelQuery = {
+         where: whereClause,  // Set by select element
+         spatialRelationship: "intersects", // Relationship operation to apply
+         geometry: extent, // Restricted to visible extent of the map
+         outFields: ["PRNAME","PRENAME","PRFNAME"], // Attributes to return
+         returnGeometry: true
+        };
+
+        parcelLayer.queryFeatures(parcelQuery)
+
+        .then((results) => {
+
+
+          displayResults(results);
+
+        }).catch((error) => {
+          console.log(error.error);
+        });
+
+      }
+
+      function displayResults(results) {
+        // Andrea Reid: change polygon from blue to RED
+        const symbol = {
+          type: "simple-fill",
+          color: [ 255, 0, 0, 0.5 ],
+          outline: {
+            color: "white",
+            width: .5
+          },
+        };
+		
+		// Andrea Reid: Adapt popups for Canada web service
+        const popupTemplate = {
+          title: "Province/Territory",
+          content: "Name (English): {PRENAME} <br> Name (French): {PRFNAME}"
+        };
+        // Assign styles and popup to features
+        results.features.map((feature) => {
+          feature.symbol = symbol;
+          feature.popupTemplate = popupTemplate;
+          return feature;
+        });
+
+        // Clear display
+        view.popup.close();
+        view.graphics.removeAll();
+        // Add features to graphics layer
+        view.graphics.addMany(results.features);
+
+      }
+
+    });
+  </script>
+</head>
+<body>
+  <div>
+    <h1>Learn About Canada's Provinces and Territories</h1>
+	<p>Choose a province or territory from the dropdown menu and click on the coloured polygon to learn more about your selection.</p>
+	
+  </div>
+  <div id="viewDiv"></div>
+</body>
+</html>
